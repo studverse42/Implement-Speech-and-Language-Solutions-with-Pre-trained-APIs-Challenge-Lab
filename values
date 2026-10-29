@@ -1,0 +1,4 @@
+set -e
+
+PROJECT_ID=""
+BUCKET="gs://"
