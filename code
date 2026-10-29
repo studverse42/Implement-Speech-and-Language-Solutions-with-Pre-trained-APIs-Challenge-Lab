@@ -1,8 +1,4 @@
 
-set -e
-
-PROJECT_ID=""
-BUCKET="gs://"
 
 gcloud config set project "$PROJECT_ID"
 
