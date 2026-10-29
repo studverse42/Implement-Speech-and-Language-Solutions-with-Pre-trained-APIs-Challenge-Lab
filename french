@@ -1,0 +1,31 @@
+
+# Create the required French transcription request
+cat <<'EOF' > speech_request_fr.json
+{
+  "config": {
+    "encoding": "FLAC",
+    "languageCode": "fr-FR"
+  },
+  "audio": {
+    "uri": "gs://cloud-samples-data/speech/corbeau_renard.flac"
+  }
+}
+EOF
+
+# Upload the exact request filename required by the lab
+gcloud storage cp speech_request_fr.json \
+  gs://qwiklabs-gcp-02-094b91b3b392-speech/
+
+# Call the Speech-to-Text API
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  --data-binary @speech_request_fr.json \
+  "https://speech.googleapis.com/v1/speech:recognize?key=${API_KEY}" \
+  -o speech_response_fr.json
+
+# Upload the response file too
+gcloud storage cp speech_response_fr.json \
+  gs://qwiklabs-gcp-02-094b91b3b392-speech/
+
+# Verify both files exist in the bucket
+gcloud storage ls gs://qwiklabs-gcp-02-094b91b3b392-speech/
