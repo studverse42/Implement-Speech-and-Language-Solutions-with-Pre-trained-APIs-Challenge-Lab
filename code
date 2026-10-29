@@ -1,0 +1,108 @@
+
+set -e
+
+BUCKET="gs://qwiklabs-gcp-02-7ed33da94281-speech"
+
+if [ -z "$API_KEY" ]; then
+  echo 'API_KEY is not set. Run: export API_KEY="YOUR_KEY"'
+  exit 1
+fi
+
+# Task 2: Generate synthetic speech
+cat > synthesize-text.json <<'EOF'
+{
+  "input": {
+    "text": "Cloud Text-to-Speech API allows developers to include natural-sounding, synthetic human speech as playable audio in their applications. The Text-to-Speech API converts text or Speech Synthesis Markup Language (SSML) input into audio data like MP3 or LINEAR16 (the encoding used in WAV files)."
+  },
+  "voice": {
+    "languageCode": "en-gb",
+    "name": "en-GB-Standard-A",
+    "ssmlGender": "FEMALE"
+  },
+  "audioConfig": {
+    "audioEncoding": "MP3"
+  }
+}
+EOF
+
+curl -sS -X POST \
+  -H "X-Goog-Api-Key: ${API_KEY}" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  --data @synthesize-text.json \
+  "https://texttospeech.googleapis.com/v1/text:synthesize" \
+  -o synthesize-text.txt
+
+python3 - <<'PY'
+import json, base64
+with open("synthesize-text.txt") as f:
+    data = json.load(f)
+if "audioContent" not in data:
+    raise SystemExit("Text-to-Speech error: " + json.dumps(data))
+with open("synthesize-text-audio.mp3", "wb") as f:
+    f.write(base64.b64decode(data["audioContent"]))
+print("Speech audio created successfully.")
+PY
+
+gcloud storage cp synthesize-text.txt "$BUCKET/"
+gcloud storage cp synthesize-text-audio.mp3 "$BUCKET/"
+
+# Task 3: Transcribe French audio
+cat > speech_request_fr.json <<'EOF'
+{
+  "config": {
+    "encoding": "FLAC",
+    "languageCode": "fr-FR"
+  },
+  "audio": {
+    "uri": "gs://cloud-samples-data/speech/corbeau_renard.flac"
+  }
+}
+EOF
+
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  --data-binary @speech_request_fr.json \
+  "https://speech.googleapis.com/v1/speech:recognize?key=${API_KEY}" \
+  -o speech_response_fr.json
+
+python3 -c 'import json; d=json.load(open("speech_response_fr.json")); assert "error" not in d, d; print("French transcription response received.")'
+
+gcloud storage cp speech_request_fr.json "$BUCKET/"
+gcloud storage cp speech_response_fr.json "$BUCKET/"
+
+# Task 4: Translate Japanese text into English
+cat > translation_request.json <<'EOF'
+{
+  "q": "これは日本語です。",
+  "target": "en"
+}
+EOF
+
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  --data-binary @translation_request.json \
+  "https://translation.googleapis.com/language/translate/v2?key=${API_KEY}" \
+  -o translated_response.txt
+
+python3 -c 'import json; d=json.load(open("translated_response.txt")); assert "error" not in d, d; print("Translation response received.")'
+
+gcloud storage cp translated_response.txt "$BUCKET/"
+
+# Task 5: Detect the language
+cat > detect_request.json <<'EOF'
+{
+  "q": "Este%é%japonês."
+}
+EOF
+
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  --data-binary @detect_request.json \
+  "https://translation.googleapis.com/language/translate/v2/detect?key=${API_KEY}" \
+  -o detected_response.txt
+
+python3 -c 'import json; d=json.load(open("detected_response.txt")); assert "error" not in d, d; print("Language detection response received.")'
+
+gcloud storage cp detected_response.txt "$BUCKET/"
+
+echo "All five task commands completed. Check each task in the lab."
